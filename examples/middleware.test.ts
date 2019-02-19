@@ -23,40 +23,51 @@ const serialMiddleware = (
     Promise.resolve(context)
   );
 
+function createTestServer(
+  handler: (
+    resolve: Function,
+    reject: Function
+  ) => (req: http.IncomingMessage, res: http.ServerResponse) => void
+) {
+  const server = http.createServer();
+  return {
+    fakeRequest(req: {}, res: {}): void {
+      server.emit('request', req, res);
+    },
+    requestHandled: new Promise((resolve, reject) => {
+      server.once('request', handler(resolve, reject));
+    }),
+  };
+}
+
 describe('Example: Middleware', () => {
   test('(temporary) server test works', async () => {
     expect.assertions(1);
 
-    const server = http.createServer();
-    const requestHandled = new Promise(resolve => {
-      server.once('request', (req, res) => resolve(res));
-    });
+    const server = createTestServer(resolve => (req, res) => resolve(res));
 
     await delay(100);
-    server.emit('request', {}, { foo: 'bar' });
+    server.fakeRequest({}, { foo: 'bar' });
 
-    return expect(requestHandled).resolves.toEqual({ foo: 'bar' });
+    return expect(server.requestHandled).resolves.toEqual({ foo: 'bar' });
   });
 
   it('passes async calls through the stack in success case', () => {
     expect.assertions(1);
 
-    const server = http.createServer();
     const middlewares = [authMiddleware, cspMiddleware, userMiddleware];
-    const requestHandled = new Promise(resolve => {
-      server.once('request', async (req, res) => {
-        const context = await serialMiddleware(req, res, {}, middlewares);
-        resolve(context);
-      });
+    const server = createTestServer(resolve => async (req, res) => {
+      const context = await serialMiddleware(req, res, {}, middlewares);
+      resolve(context);
     });
 
     delay(100).then(() => {
       const req = { auth: 'fake-auth-session-id' };
       const res = {};
-      server.emit('request', req, res);
+      server.fakeRequest(req, res);
     });
 
-    return expect(requestHandled).resolves.toEqual({
+    return expect(server.requestHandled).resolves.toEqual({
       authenticated: true,
       cspToken: '1234',
       user: null,
@@ -66,28 +77,27 @@ describe('Example: Middleware', () => {
   it('allows catching promise rejection if a middleware "throws"', () => {
     expect.assertions(1);
 
-    const server = http.createServer();
     const middlewares = [securityMiddleware, authMiddleware, cspMiddleware];
-    const requestHandled = new Promise((resolve, reject) => {
-      server.once('request', (req, res) => {
-        serialMiddleware(req, res, {}, middlewares).then(
-          context => {
-            resolve(context);
-          },
-          error => {
-            reject(error);
-          }
-        );
-      });
+    const server = createTestServer((resolve, reject) => (req, res) => {
+      serialMiddleware(req, res, {}, middlewares).then(
+        context => {
+          resolve(context);
+        },
+        error => {
+          reject(error);
+        }
+      );
     });
 
     delay(100).then(() => {
       const req = { isDanger: true };
       const res = {};
-      server.emit('request', req, res);
+      server.fakeRequest(req, res);
     });
 
-    return expect(requestHandled).rejects.toThrow(SecurityViolationError);
+    return expect(server.requestHandled).rejects.toThrow(
+      SecurityViolationError
+    );
   });
 });
 
