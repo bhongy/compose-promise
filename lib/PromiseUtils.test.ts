@@ -19,6 +19,7 @@ describe('PromiseUtils', () => {
     it('does not execute the next function until the previous one resolves', async () => {
       expect.assertions(5);
 
+      // TODO: figure out a better way to test this so it's: setup -> execute -> assertions
       const p1 = jest.fn(async () => {
         await delay(100);
         expect(p2).not.toHaveBeenCalled();
@@ -40,10 +41,10 @@ describe('PromiseUtils', () => {
     it('skips all functions after the function that rejectes the promise', async () => {
       expect.assertions(8);
 
-      const ps = [1, 5, 10, 50, 100].map((v: number, i: number) =>
+      const ps = [1, 5, 10, 50, 100].map((v, i) =>
         i === 2
           ? jest.fn().mockRejectedValue(Error('something went wrong'))
-          : jest.fn((prev: number) => delay(100).then(() => prev + v))
+          : jest.fn(prev => delay(100).then(() => prev + v))
       );
 
       try {
