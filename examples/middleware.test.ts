@@ -29,7 +29,7 @@ describe('Example: Middleware', () => {
 
     const server = http.createServer();
     const requestHandled = new Promise(resolve => {
-      server.on('request', (req, res) => resolve(res));
+      server.once('request', (req, res) => resolve(res));
     });
 
     await delay(100);
@@ -44,7 +44,7 @@ describe('Example: Middleware', () => {
     const server = http.createServer();
     const middlewares = [authMiddleware, cspMiddleware, userMiddleware];
     const requestHandled = new Promise(resolve => {
-      server.on('request', async (req, res) => {
+      server.once('request', async (req, res) => {
         const context = await serialMiddleware(req, res, {}, middlewares);
         resolve(context);
       });
@@ -69,7 +69,7 @@ describe('Example: Middleware', () => {
     const server = http.createServer();
     const middlewares = [securityMiddleware, authMiddleware, cspMiddleware];
     const requestHandled = new Promise((resolve, reject) => {
-      server.on('request', (req, res) => {
+      server.once('request', (req, res) => {
         serialMiddleware(req, res, {}, middlewares).then(
           context => {
             resolve(context);
