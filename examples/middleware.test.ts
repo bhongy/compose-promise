@@ -42,7 +42,7 @@ describe('Example: Middleware', () => {
     expect.assertions(1);
 
     const server = http.createServer();
-    const middlewares = [authMiddleware, cspMiddleware];
+    const middlewares = [authMiddleware, cspMiddleware, userMiddleware];
     const requestHandled = new Promise(resolve => {
       server.on('request', async (req, res) => {
         const context = await serialMiddleware(req, res, {}, middlewares);
@@ -59,6 +59,7 @@ describe('Example: Middleware', () => {
     return expect(requestHandled).resolves.toEqual({
       authenticated: true,
       cspToken: '1234',
+      user: null,
     });
   });
 
@@ -112,4 +113,18 @@ const securityMiddleware: Middleware = (
     throw new SecurityViolationError('Yikes!');
   }
   return context;
+};
+
+// async function is just a sugar that helps unnesting .then expressions
+// and ensure the function always return a promise (never throws)
+const userMiddleware: Middleware = (req, res) => context => {
+  const fetchUserThatAlwaysFail = (userId: string) =>
+    Promise.reject({ statusCode: 404, error: 'User not found.' });
+
+  return fetchUserThatAlwaysFail('winnie-the-pooh').then(
+    ({ payload }) => ({ ...context, user: payload }),
+    // a middleware that has baked-in recovery from promise rejection
+    // it will always resolved
+    () => ({ ...context, user: null })
+  );
 };
